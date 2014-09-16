@@ -17,9 +17,7 @@
 >   (.<>.) :: k -> k -> k
 
 > class IsKey k => k `IsKeyFor` v | v -> k where
->   (<.>)  :: v -> v -> k
->   (.>)   :: k -> v -> k
->   (<.)   :: v -> k -> k
+>   toKey :: v -> k
 >
 >   goLeft :: v -> k -> Bool
 >   goLeft x k = not $ goRight x k
@@ -148,9 +146,9 @@ pre: - blackHeight Left <= blackHeight Right
 > node :: (k `IsKeyFor` v) => Color -> Node k v -> BlackHeight -> Node k v -> Node k v
 > node c l h r = Node c l h (l <..> r) r
 >   where
->     (Leaf x)         <..> (Leaf y)         = x <.> y
->     (Leaf x)         <..> (Node _ _ _ k _) = x <. k
->     (Node _ _ _ k _) <..> (Leaf x)         = k .> x
+>     (Leaf x)         <..> (Leaf y)         = toKey x .<>. toKey y
+>     (Leaf x)         <..> (Node _ _ _ k _) = toKey x .<>. k
+>     (Node _ _ _ k _) <..> (Leaf x)         = k .<>. toKey x
 >     (Node _ _ _ k _) <..> (Node _ _ _ l _) = k .<>. l
 
 
@@ -191,6 +189,12 @@ to, and returns this y.
 > deleteUnSafe x t = let (l,_,r) = split x t in l `join` r
 
 
+> insert x t = l `join` m `join` r
+>   where
+>     (l,y,r) = split x t
+>     m       = if goLeft x (toKey x .<>. toKey y) then singleton x `join` singleton y
+>                                                  else singleton y `join` singleton x
+>
 
 
 > sing :: a -> BalBST (Key a) (Id a)
@@ -204,21 +208,32 @@ to, and returns this y.
 > data Range a = Range a a
 >                deriving (Show,Read,Eq,Ord)
 
-> data Key a = Key a (Range a)
->                 deriving (Show,Read,Eq,Ord)
+-- > data Key a = Key a (Range a)
+-- >                 deriving (Show,Read,Eq,Ord)
+
+
+
+-- > instance IsKey (Key a) where
+-- >   (Key _ (Range l m)) .<>. (Key _ (Range _ u)) = Key m (Range l u)
+
+
+> data Key a = Key a a
+>                 deriving (Show,Eq,Ord)
 
 > instance IsKey (Key a) where
->   (Key _ (Range l m)) .<>. (Key _ (Range _ u)) = Key m (Range l u)
-
+>   (Key _ ml) .<>. (Key _ mr) = Key ml mr
 
 > newtype Id a = Id a deriving (Show,Eq,Ord)
 
 > instance Ord a => (Key a) `IsKeyFor` (Id a) where
->   (Id x) <.> (Id y) = Key x (Range x y)
->   (Key _ (Range l u))  .> (Id y) = Key u (Range l y)
->   (Id x) <. (Key _ (Range _ u)) = Key x (Range x u)
+>   toKey (Id x) = Key x x
 >
 >   goLeft (Id x) (Key y _) = x <= y
+
+-- >   (Id x) <.> (Id y) = Key x (Range x y)
+-- >   (Key _ (Range l u))  .> (Id y) = Key u (Range l y)
+-- >   (Id x) <. (Key _ (Range _ u)) = Key x (Range x u)
+
 
 --------------------------------------------------------------------------------
 
