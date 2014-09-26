@@ -1,23 +1,20 @@
 
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
 module Data.BalBST where
 
-import Prelude hiding (foldr,foldl)
+import Prelude hiding (foldr,foldl,join)
 
 import Control.Applicative((<$>))
-import Data.Monoid
+import Data.Semigroup
 import Data.Foldable
 
 
 --------------------------------------------------------------------------------
 
-class IsKey k where
-  (.<>.) :: k -> k -> k
-
-class IsKey k => k `IsKeyFor` v | v -> k where
+class Semigroup k => k `IsKeyFor` v | v -> k where
   toKey :: v -> k
 
   goLeft :: v -> k -> Bool
@@ -38,7 +35,7 @@ data Node k v = Leaf v
 
 instance Foldable (Node k) where
   foldMap f (Leaf v) = f v
-  foldMap f (Node _ l _ _ r) = foldMap f l <> foldMap f r
+  foldMap f (Node _ l _ _ r) = foldMap f l `mappend` foldMap f r
 
 
 
@@ -49,7 +46,7 @@ instance Foldable (Node k) where
 data BalBST k v = Empty | BalBST (Node k v)
                 deriving (Show,Eq)
 
-instance Foldable (BalBST k) where
+instance Semigroup k => Foldable (BalBST k) where
   foldMap _ Empty = mempty
   foldMap f (BalBST n) = foldMap f n
 
@@ -71,7 +68,14 @@ blacken :: Node k v -> Node k v
 blacken (Node c l h k r) = let h' = if c == Black then h else h + 1
                            in Node Black l h' k r
 
+
+empty :: BalBST k v
 empty = Empty
+
+
+--foo :: [a] -> a
+
+singleton :: v -> BalBST k v
 singleton x = BalBST (Leaf x)
 
 --------------------------------------------------------------------------------
@@ -147,10 +151,10 @@ bal h a b c d = node Red (node Black a h b) h (node Black c h d)
 node :: (k `IsKeyFor` v) => Color -> Node k v -> BlackHeight -> Node k v -> Node k v
 node c l h r = Node c l h (l <..> r) r
   where
-    (Leaf x)         <..> (Leaf y)         = toKey x .<>. toKey y
-    (Leaf x)         <..> (Node _ _ _ k _) = toKey x .<>. k
-    (Node _ _ _ k _) <..> (Leaf x)         = k .<>. toKey x
-    (Node _ _ _ k _) <..> (Node _ _ _ z _) = k .<>. z
+    (Leaf x)         <..> (Leaf y)         = toKey x <> toKey y
+    (Leaf x)         <..> (Node _ _ _ k _) = toKey x <> k
+    (Node _ _ _ k _) <..> (Leaf x)         = k <> toKey x
+    (Node _ _ _ k _) <..> (Node _ _ _ z _) = k <> z
 
 
 
@@ -194,8 +198,8 @@ insert :: IsKeyFor k v => v -> BalBST k v -> BalBST k v
 insert x t = l `join` m `join` r
   where
     (l,y,r) = split x t
-    m       = if goLeft x (toKey x .<>. toKey y) then singleton x `join` singleton y
-                                                 else singleton y `join` singleton x
+    m       = if goLeft x (toKey x <> toKey y) then singleton x `join` singleton y
+                                               else singleton y `join` singleton x
 
 
 
@@ -213,8 +217,8 @@ data Range a = Range a a
 data Key a = Key a a
                 deriving (Show,Eq,Ord)
 
-instance IsKey (Key a) where
-  (Key _ ml) .<>. (Key _ mr) = Key ml mr
+instance Semigroup (Key a) where
+  (Key _ ml) <> (Key _ mr) = Key ml mr
 
 newtype Id a = Id a deriving (Show,Eq,Ord)
 
