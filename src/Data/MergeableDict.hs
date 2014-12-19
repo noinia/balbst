@@ -46,6 +46,9 @@ insert   :: Ord a => a -> RBTree a -> RBTree a
 insert x = blacken . insertRB' x
 
 
+-- | Get a certain value in the tree (if it exists).
+--
+-- Running time O(log n)
 lookup                    :: Ord a => a -> RBTree a -> Maybe a
 lookup _ Leaf             = Nothing
 lookup x (Node _ _ l y r) = case x `compare` y of
@@ -53,7 +56,8 @@ lookup x (Node _ _ l y r) = case x `compare` y of
                               LT -> lookup x l
                               GT -> lookup x r
 
-
+-- | Get the successor of a given value (if it exists):
+-- running time: O(log n)
 successor     :: Ord a => a -> RBTree a -> Maybe a
 successor x t = let (_,t') = split x t
                 in minimum t'
