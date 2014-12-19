@@ -1,10 +1,10 @@
 module Data.MergeableDict where
 
-import Prelude hiding (join)
+import Prelude hiding (join, lookup, find, foldr, foldr1, minimum, maximum)
 
 import Control.Applicative(pure, (<$>),(<*>))
 
-import Data.Foldable(Foldable)
+import Data.Foldable(Foldable, foldr, foldr1)
 import Data.Traversable
 
 import qualified Data.Foldable as F
@@ -37,12 +37,26 @@ instance Traversable RBTree where
 
 empty :: RBTree a
 empty = Leaf
+
 singleton :: Ord a => a -> RBTree a
 singleton = flip insert empty
 
 
 insert   :: Ord a => a -> RBTree a -> RBTree a
 insert x = blacken . insertRB' x
+
+
+lookup                    :: Ord a => a -> RBTree a -> Maybe a
+lookup _ Leaf             = Nothing
+lookup x (Node _ _ l y r) = case x `compare` y of
+                              EQ -> Just x
+                              LT -> lookup x l
+                              GT -> lookup x r
+
+
+successor     :: Ord a => a -> RBTree a -> Maybe a
+successor x t = let (_,t') = split x t
+                in minimum t'
 
 
 -- | Splits the tree at x; left is everything < x, right > x
@@ -96,18 +110,18 @@ insertRB' x (Node c h l y r)
 ----------------------------------------
 -- | Splitting
 
-split'        :: Ord a => a -> RBTree a -> (RBTree a, RBTree a)
-split' x Leaf = (Leaf,Leaf)
-split' x (Node c h l y r)
-  | x == y    = (l,r)
-  | x <  y    = let (ll,lr) = split' x l in (ll,join' lr y r)
-  | otherwise = let (rl,rr) = split' x r in (join' l y rl,rr)
+split'                    :: Ord a => a -> RBTree a -> (RBTree a, RBTree a)
+split' _ Leaf             = (Leaf,Leaf)
+split' x (Node _ _ l y r) = case x `compare` y of
+                              EQ -> (l,r)
+                              LT -> let (ll,lr) = split' x l in (ll,join' lr y r)
+                              GT -> let (rl,rr) = split' x r in (join' l y rl,rr)
 
 ----------------------------------------
 -- | Joining
 
 -- | Joins two trees with in the middle element m
-join' :: Ord a => RBTree a -> a -> RBTree a -> RBTree a
+join'                              :: Ord a => RBTree a -> a -> RBTree a -> RBTree a
 join' l m r
   | blackHeight l >= blackHeight r = joinL l m r
   | otherwise                      = joinR l m r
@@ -128,9 +142,18 @@ joinR ll m n@(Node c h l x r)
 ----------------------------------------
 -- | Merging
 
+minimum :: Ord a => RBTree a -> Maybe a
+minimum = fmap fst . extractMin
+
+extractMin      :: Ord a => RBTree a -> Maybe (a, RBTree a)
+extractMin Leaf = Nothing
+extractMin t    = Just $ extractMin' t
+
+
 extractMin'                     :: Ord a => RBTree a -> (a, RBTree a)
 extractMin' (Node _ _ Leaf x r) = (x, r)
-extractMin' (Node c h l    x r) = (\l' -> join' l' x r) <$> extractMin' l
+extractMin' (Node _ _ l    x r) = (\l' -> join' l' x r) <$> extractMin' l
+extractMin' Leaf                = error "extractMin': empty tree"
 
 --------------------------------------------------------------------------------
 -- | Rebalancing code
@@ -142,6 +165,15 @@ balance Black h a x (Node Red _ (Node Red _ b y c) z d) = node h a x b y c z d
 balance Black h a x (Node Red _ b y (Node Red _ c z d)) = node h a x b y c z d
 balance co h a x b = Node co h a x b
 
+node  :: BlackHeight
+      -> RBTree a
+      -> a
+      -> RBTree a
+      -> a
+      -> RBTree a
+      -> a
+      -> RBTree a
+      -> RBTree a
 node h a x b y c z d = Node Red h (Node Black h a x b) y (Node Black h c z d)
 
 
@@ -150,4 +182,6 @@ node h a x b y c z d = Node Red h (Node Black h a x b) y (Node Black h c z d)
 fromList :: Ord a => [a] -> RBTree a
 fromList = F.foldr insert empty
 
-test' = foldr1 merge $ map singleton [1, 5, 2, 3, 4, 10, 7]
+test' = foldr1 merge $ map singleton [5, 2, 3, 4, 10, 8]
+
+test2 = foldr1 merge $ map singleton [6, 7, 1, 11, 12, 20, 9]
