@@ -81,7 +81,8 @@ join l    r = let (mr,r') = extractMin' r
 
 -- Merges two trees. The value ranges of both trees are allowed to overlap.
 --
--- running time: O(log^2 n) amortized
+-- running time: O(log^2 n) amortized, *IF* the DS is used Ephemerically. i.e.
+-- if we don't access old versions of the DS.
 merge        :: Ord a => RBTree a -> RBTree a -> RBTree a
 merge Leaf tb = tb
 merge ta   tb = let (ma,ta') = extractMin' ta
